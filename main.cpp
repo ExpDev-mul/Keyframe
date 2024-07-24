@@ -8,7 +8,15 @@
   dec a = 5 == 5
   print(a)
   dec t = "hello world"
-  print(t)
+  for i (1,5){
+    print(t)
+  }
+
+  function test(){
+    print("try to see if it works")
+  }
+
+  test()
   --------
 
 
