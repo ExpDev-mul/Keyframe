@@ -5,15 +5,12 @@
   Code Sample:
 
   --------
-  dec a = 5 == 5
-  print(a)
-  dec t = "hello world"
-  for i (1,5){
-    print(t)
-  }
+  dec text = "Hello world!"
 
   function test(){
-    print("try to see if it works")
+    for i (1, 4){
+      print(text)
+    }
   }
 
   test()
@@ -101,6 +98,7 @@ class Lexer{
       
       std::string capture = ""; // A substring of each token capture at a given pos
       size_t pos = 0; // A sliding pointer along the string to capture individual chars
+      size_t quotes = 0; // 0 quotes means we are not capturing a string, 1 means we are capturing a string
       while (pos < input.size()){ // Iterate through the whole string
         char curr = input[pos]; // Store the current char
 
@@ -120,8 +118,8 @@ class Lexer{
           }
         }
         
-        if (std::isspace(curr) || isSymbol){
-          // When spaces or any symbols are captured we have to push back the current token
+        if ((std::isspace(curr) && quotes == 0) || isSymbol){
+          // When spaces (not within strings) or any symbols are captured we have to push back the current token
           if (capture.size() > 0){ // There is a token to capture
             bool recognized = false;
             for (unsigned int i = 0; i < sizeof(keywords); i++){
@@ -154,6 +152,10 @@ class Lexer{
         } else {
           capture += curr; // Concat current char to capture string
         }
+
+        if (curr == '"'){
+          quotes = quotes == 0 ? 1 : 0;
+        }
         
         pos++; // Advance the sliding pointer
       }
@@ -178,9 +180,9 @@ class Lexer{
     }
 };
 
-std::vector<std::string> constructMemoryVariable( std::string& type, 
-                                                  std::string& name, 
-                                                  std::string& value){
+std::vector<std::string> constructMemoryVariable(std::string& type, 
+                                                 std::string& name, 
+                                                 std::string value){
   std::vector<std::string> variable;
   variable.push_back(type);
   variable.push_back(name);
@@ -262,6 +264,7 @@ class Interpreter{
 
       l = 1; // Current line index
       i = 0;
+      
       while (i < tokens.size()){
         Token curr = tokens[i];
         if (curr.type == "newline"){
@@ -278,8 +281,16 @@ class Interpreter{
               if (symbol.type == "symbol" &&  symbol.value == "="){
                 Token value = tokens[i + 3];;
                 if (value.type == "string" || value.type == "number" || value.type == "boolean"){
-                  std::vector<std::string> memoryVariable = constructMemoryVariable(value.type, name.value, value.value);
+
+                  // We want to remove the quotation marks from strings
+                  std::vector<std::string> memoryVariable = constructMemoryVariable(
+                    value.type,
+                    name.value, 
+                    value.type == "string" ? value.value.substr(1, value.value.length() - 2) : value.value
+                  );
+                  
                   memory.push_back(memoryVariable);
+                  i = i + 3;
                 }
               }
             }
@@ -293,7 +304,8 @@ class Interpreter{
               if (value.type == "string" || value.type == "number" || value.type == "boolean"){
                 const Token rightBracket = tokens[i + 3];
                 if (rightBracket.type == "symbol" && rightBracket.value == ")"){
-                  output_log(value.value, l);
+                  output_log(value.value.substr(1, value.value.length() - 2), l);
+                  i = i + 3;
                 }
               }
 
@@ -348,9 +360,11 @@ class Interpreter{
                           }
 
                           // We have captured all the code within the for loop's boundaries
-                          for (int i = std::stof(start.value); i <= std::stof(end.value); i++){
+                          for (int k = std::stof(start.value); k <= std::stof(end.value); k++){
                             execute(nested_tokens);
                           }
+
+                          i = j;
                         }
                       }
                     }
@@ -399,6 +413,8 @@ class Interpreter{
 
                     // Insert the function into the functions memory
                     memory_functions.push_back(nested_tokens);
+
+                    i = j;
                   }
                 }
               }
@@ -420,6 +436,8 @@ class Interpreter{
                   break;
                 }
               }
+
+              i = i + 2;
             }
           }
         }
@@ -452,12 +470,12 @@ int main() {
   std::cout << std::endl << std::endl;
   std::cout << "Program Execution Output:" << std::endl;
   
-  std::string test = "function name(){ print(\"yes\") } print(\"after\") name()";
+  std::string test = "dec real =\"hello world!\" print(real) function k(){ for i (1, 4){ print(real) } } k()";
   Lexer lexer = Lexer(test);
   std::vector<Token> tokens = lexer.tokenize();
 
   for (unsigned int i = 0; i < tokens.size(); i++){
-    tokens[i].print();
+    // tokens[i].print();
   }
 
   Interpreter intr = Interpreter(tokens);
