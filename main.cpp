@@ -9,7 +9,12 @@
 
   function test(){
     for i (1, 4){
-      print(text)
+      if (true){
+        print(text)
+        if (false){
+          print("this wont print")
+        }
+      }
     }
   }
 
@@ -304,7 +309,12 @@ class Interpreter{
               if (value.type == "string" || value.type == "number" || value.type == "boolean"){
                 const Token rightBracket = tokens[i + 3];
                 if (rightBracket.type == "symbol" && rightBracket.value == ")"){
-                  output_log(value.value.substr(1, value.value.length() - 2), l);
+                  if (value.type == "string"){
+                    output_log(value.value.substr(1, value.value.length() - 2), l);
+                  } else {
+                    output_log(value.value, l);
+                  }
+                  
                   i = i + 3;
                 }
               }
@@ -420,6 +430,50 @@ class Interpreter{
               }
             }
           }
+
+          if (curr.value == "if"){
+            // If statement
+            const Token symbol_one = tokens[i + 1];
+            if (symbol_one.type == "symbol" && symbol_one.value == "("){
+              const Token boolean = tokens[i + 2];
+              if ((boolean.type == "keyword" && (boolean.value == "true" || boolean.value == "false"))){
+                const Token symbol_two = tokens[i + 3];
+
+                if (symbol_two.type == "symbol" && symbol_two.value == ")"){
+                  const Token symbol_three = tokens[i + 4];
+                  if (symbol_three.type == "symbol" && symbol_three.value == "{"){
+                    // We need to capture all the code within the for condition's boundaries
+                    std::vector<Token> nested_tokens;
+                    size_t j = i + 5;
+                    size_t brackets = 1; // Counter for how many brackets are left within the scope of this for loop. Once this reaches zero we have gone off the for loop.
+                    while (j < tokens.size() && brackets > 0){
+                      Token j_curr = tokens[j];
+                      if (j_curr.type == "symbol" && j_curr.value == "{"){
+                        brackets++;
+                      } else if (j_curr.type == "symbol" && j_curr.value == "}") {
+                        brackets--;
+                      }
+
+                      if (brackets == 0){
+                        break;
+                      }
+
+                      nested_tokens.push_back(tokens[j]);
+                      j++;
+                    }
+
+                    // We have captured all the code within the for loop's boundaries
+
+                    if (boolean.value == "true"){
+                      execute(nested_tokens);
+                    }
+
+                    i = j;
+                  }
+                }
+              }
+            }
+          }
         }
 
         if (curr.type == "unknown"){
@@ -470,12 +524,12 @@ int main() {
   std::cout << std::endl << std::endl;
   std::cout << "Program Execution Output:" << std::endl;
   
-  std::string test = "dec real =\"hello world!\" print(real) function k(){ for i (1, 4){ print(real) } } k()";
+  std::string test = "if (true){ print(8) if (true){ print(\"ok\") } }";
   Lexer lexer = Lexer(test);
   std::vector<Token> tokens = lexer.tokenize();
 
   for (unsigned int i = 0; i < tokens.size(); i++){
-    // tokens[i].print();
+    tokens[i].print();
   }
 
   Interpreter intr = Interpreter(tokens);
