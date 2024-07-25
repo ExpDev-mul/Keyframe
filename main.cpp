@@ -6,19 +6,22 @@
 
   --------
   dec text = "Hello world!"
+  dec k = 5
 
   function test(){
     for i (1, 4){
       if (true){
-        print(text)
+        print(k)
         if (false){
           print("this wont print")
         }
       }
     }
+
+    return text
   }
 
-  test()
+  print(test())
   --------
 
 
