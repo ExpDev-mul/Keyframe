@@ -5,14 +5,15 @@
   Code Sample:
 
   --------
-  dec text = "Hello world!"
+  dec text = ("Hello " + "world!")
+  dec expr = (true or false and false)
 
   function test(){
     for i (1, 4){
       if (true){
         print(text)
-        if (false){
-          print("this wont print")
+        if (expr){
+          print("This won't print")
         }
       }
     }
