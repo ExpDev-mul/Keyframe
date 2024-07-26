@@ -6,22 +6,19 @@
 
   --------
   dec text = "Hello world!"
-  dec k = 5
 
   function test(){
     for i (1, 4){
       if (true){
-        print(k)
+        print(text)
         if (false){
           print("this wont print")
         }
       }
     }
-
-    return text
   }
 
-  print(test())
+  test()
   --------
 
 
@@ -68,6 +65,11 @@ int stringIsNumber(std::string str){
   return (points == 0 ? 1 : 2);
 }
 
+std::string removeFirstAndLast(std::string str){
+  // Removes the first and last characters of a string, mainly useful for lexical analysis of string experssions.
+  return str.substr(1, str.length() - 2);
+}
+
 class Token
 {
   /*
@@ -102,8 +104,8 @@ class Lexer{
       std::vector<Token> tokens; // A vector consisting of all the tokens
       
       // Recognized symbols
-      char symbols[] = {':', ',', '(', ')', '{', '}', '[', ']', '='};
-      std::string keywords[] = {"dec", "print", "if", "for", "function", "return"};
+      char symbols[] = {':', ',', '(', ')', '{', '}', '[', ']', '=', '+', '!'};
+      std::string keywords[] = {"dec", "print", "if", "for", "function", "return", "and", "or"};
       
       std::string capture = ""; // A substring of each token capture at a given pos
       size_t pos = 0; // A sliding pointer along the string to capture individual chars
@@ -256,7 +258,7 @@ class Interpreter{
         Nested tokens within some experession will be evaluated using this method 
         The indexing checks are done to prevent Segmentation Faults
       */
-      
+            
       // The expression is potentially a boolean expression
       if (local_tokens.size() > 3 && local_tokens[1].type == "symbol" && local_tokens[1].value == "=" && local_tokens[2].type == "symbol" && local_tokens[2].value == "="){
         Token left = local_tokens[0];
@@ -272,8 +274,58 @@ class Interpreter{
           return Token("run_error", "Attempt to compare different types");
         }
       }
+
       
-      if (local_tokens[0].type == "string" || local_tokens[0].type == "number" || local_tokens[0].type == "boolean"){
+
+      Token first_token = local_tokens[0];
+      if (first_token.type == "string" || first_token.type == "number" || first_token.type == "boolean"){
+        const Token after_token = local_tokens[1];
+        
+        if (after_token.type == "symbol" && after_token.value == "+"){
+          // We are evaluating an expression with operators
+          if (first_token.type == "string"){
+            // String concatenation
+            std::string comp_value = removeFirstAndLast(first_token.value);
+
+            size_t i = 2; // Iterate through concatenation orders (ex. "a" + "b" + "c" + ...)
+            while (i < local_tokens.size()){
+              const Token prev_token = local_tokens[i - 1];
+              if (prev_token.type == "symbol" && prev_token.value == "+"){
+                const std::string concat_string = removeFirstAndLast(local_tokens[i].value);
+                comp_value += (concat_string);
+                i += 2;
+              }
+            }
+            
+            return Token("string", "\"" + comp_value + "\""); // Artifically sorround with quotation marks
+          } else {
+            return Token("run_error", "Attempt to concatenate string with differing type.");
+          }
+        }
+
+        if (after_token.type == "keyword" && (after_token.value == "and" || after_token.value == "or")){
+          // Boolean logical operators
+          bool evaluated_value = first_token.value == "false" ? false : true;
+
+          size_t i = 2; // Iterate through concatenation orders (ex. "a" + "b" + "c" + ...)
+          while (i < local_tokens.size()){
+            const Token prev_token = local_tokens[i - 1];
+            if (prev_token.type == "keyword" && (prev_token.value == "and" || prev_token.value == "or")){
+              const std::string other_value = local_tokens[i].value;
+              const bool converted = other_value == "true" ? true : false;
+                evaluated_value = prev_token.value == "and" ? converted && evaluated_value : converted || evaluated_value;
+              i += 2;
+            }
+          }
+
+          return Token("boolean", evaluated_value ? "true" : "false");
+        }
+        
+        if (first_token.type == "string"){
+          // With strings uniquely we neglect the quotation marks and subtract them off the original string
+          return Token("string", removeFirstAndLast(first_token.value));
+        }
+        
         return local_tokens[0]; // If the expression is already of a known datatype we can instantly return it
       }
 
@@ -390,7 +442,6 @@ class Interpreter{
                 
                 Token value = tokens[i + 3];
                 if (value.type == "string" || value.type == "number" || value.type == "boolean"){
-
                   // We want to remove the quotation marks from strings
                   std::vector<std::string> memoryVariable = constructMemoryVariable(
                     value.type,
@@ -400,6 +451,23 @@ class Interpreter{
                   
                   memory.push_back(memoryVariable);
                   i = i + 3;
+                }
+
+                // It may be containing an expression within, such as var x = (...), therefore we should check for brackets.
+                if (value.type == "symbol" && value.value == "("){
+                  std::vector<Token> arguments_tokens;
+                  int j;
+                  std::tie(arguments_tokens, j) = get_nested_tokens(i + 4, "(", ")");
+
+                  i = j;
+                  Token brackets_value = evaluate_experssion(arguments_tokens);
+                  std::vector<std::string> memoryVariable = constructMemoryVariable(
+                    brackets_value.type,
+                    name.value, 
+                    brackets_value.type == "string" ? brackets_value.value.substr(1, brackets_value.value.length() - 2) : brackets_value.value
+                  );
+
+                  memory.push_back(memoryVariable);
                 }
               }
             }
@@ -418,8 +486,6 @@ class Interpreter{
               Token value = evaluate_experssion(arguments_tokens);
               if (value.type == "string" || value.type == "number" || value.type == "boolean"){
                 if (value.type == "string"){
-                  output_log(value.value.substr(1, value.value.length() - 2), l);
-                } else {
                   output_log(value.value, l);
                 }
               }
@@ -587,12 +653,12 @@ int main() {
   std::cout << std::endl << std::endl;
   std::cout << "Program Execution Output:" << std::endl;
 
-  std::string test = "dec b = 6 function ask(){ for i (1, 4) { print(\"This will print out the value of b soon...\") } return (b) } print(ask())";
+  std::string test = "dec a = (true or false)";
   Lexer lexer = Lexer(test);
   std::vector<Token> tokens = lexer.tokenize();
   
   for (unsigned int i = 0; i < tokens.size(); i++){
-    // tokens[i].print();
+    tokens[i].print();
   }
   
   Interpreter intr = Interpreter(tokens);
