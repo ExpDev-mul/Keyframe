@@ -10,33 +10,36 @@
   - Boolean logical operators (and, or)
   - String concatenation
   - Variable assignment post-declaration
-  - Arrays (including multiple-dimensions arrays, arrays containing different types, and indexing)
-
-  Example Code:
-  ---------------
-
-  dec a = "Hello" + " world!"
-
-  function test(){
-    for i = (1, 5){
-      if (a == "Hello world!"){
-        print("Equal!")
-      }
-      
-      print(a)
-    }
-
-    return 10
-  }
-
-  print(test())
-  a = 5
-  print(a)
-  
-  ---------------
-
+  - Arrays (including multiple-dimensional arrays, and arrays containing different types)
 
   All rights reserved to Or Pinto ©
+
+*/
+
+// Example Code
+/*
+
+---------------
+
+dec a = ("Hello" + " world!")
+
+function test(){
+  for i = (1, 5){
+    if (a == "Hello world!"){
+      print("Equal!")
+    } else {
+      print(a)
+    }
+  }
+
+  return 10
+}
+
+print(test())
+a = (5)
+print(a)
+
+---------------
 
 */
 
@@ -162,7 +165,7 @@ class Lexer{
           }
         }
         
-        if ((std::isspace(curr) && quotes == 0) || isSymbol){
+        if ((std::isspace(curr) && quotes == 0 && brackets == 0) || isSymbol){
           // When spaces (not within strings) or any symbols are captured we have to push back the current token
           if (capture.size() > 0){ // There is a token to capture
             bool recognized = false;
@@ -315,6 +318,7 @@ class Interpreter{
       if (local_tokens.size() > 3 && local_tokens[1].type == "symbol" && local_tokens[1].value == "=" && local_tokens[2].type == "symbol" && local_tokens[2].value == "="){
         Token left = local_tokens[0];
         Token right = local_tokens[3];
+
         if (left.type == right.type){
           if (left.value == right.value){
             return Token("boolean", "true");
@@ -480,6 +484,7 @@ class Interpreter{
         Token curr = tokens[i];
 
         if (curr.type == "ignore"){ // Skip scan on ignored tokens
+          i++;
           continue;
         }
         
@@ -758,7 +763,7 @@ int main() {
   std::cout << std::endl << std::endl;
   std::cout << "Program Execution Output:" << std::endl;
 
-  std::string test = "";
+  std::string test = "dec t = 5 print(t) dec b = (t==5) print(b)";
   Lexer lexer = Lexer(test);
   std::vector<Token> tokens = lexer.tokenize();
   
