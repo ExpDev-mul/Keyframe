@@ -21,9 +21,7 @@
     for i = (1, 5){
       if (a == "Hello world!"){
         print("Equal!")
-      } else {
-        print(a)
-      }
+      print(a)
     }
 
     return 10
