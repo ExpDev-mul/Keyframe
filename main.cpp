@@ -2,24 +2,37 @@
 
   Keyframe Language Interpreter
 
-  Code Sample:
+  Supports:
+  - Variable declaration/usage (supporting strings, numbers, and booleans)
+  - Function declaration/calling
+  - For loops
+  - If statements
+  - Boolean logical operators (and, or)
+  - String concatenation
+  - Variable assignment post-declaration
 
-  --------
-  dec text = "Hello world!"
+  Example Code:
+  ---------------
+
+  dec a = "Hello" + " world!"
 
   function test(){
-    for i (1, 4){
-      if (true){
-        print(text)
-        if (false){
-          print("this wont print")
-        }
+    for i (1, 5){
+      if (a == "Hello world!"){
+        print("Equal!")
+      } else {
+        print(a)
       }
     }
+
+    return 10
   }
 
-  test()
-  --------
+  print(test())
+  a = 5
+  print(a)
+  
+  ---------------
 
 
   All rights reserved to Or Pinto ©
@@ -619,6 +632,19 @@ class Interpreter{
               i = i + 2;
             }
           }
+
+          // There might be an attempt to assign a value to some variable
+          if (symbol_one.type == "symbol" && symbol_one.value == "="){
+            const Token assigned_value = tokens[i + 2];
+            for (unsigned int i = 0; i < memory.size(); i++){
+              // We need to find the variable with a matching name
+              if (memory[i][1] == curr.value){
+                // Update the variable's type and value
+                memory[i][0] = assigned_value.type;
+                memory[i][2] = assigned_value.value;
+              }
+            }
+          }
         }
         
         i++;
@@ -652,12 +678,12 @@ int main() {
   std::cout << std::endl << std::endl;
   std::cout << "Program Execution Output:" << std::endl;
 
-  std::string test = "dec a = (true or false) print(a)";
+  std::string test = "dec a = 5 print(a) a=3 print(a)";
   Lexer lexer = Lexer(test);
   std::vector<Token> tokens = lexer.tokenize();
   
   for (unsigned int i = 0; i < tokens.size(); i++){
-    // tokens[i].print();
+    tokens[i].print();
   }
   
   Interpreter intr = Interpreter(tokens);
