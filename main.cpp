@@ -10,6 +10,7 @@
   - Boolean logical operators (and, or)
   - String concatenation
   - Variable assignment post-declaration
+  - Arrays (including multiple-dimensional arrays, arrays containing different types, and indexing)
 
   Example Code:
   ---------------
@@ -17,7 +18,7 @@
   dec a = "Hello" + " world!"
 
   function test(){
-    for i (1, 5){
+    for i = (1, 5){
       if (a == "Hello world!"){
         print("Equal!")
       } else {
@@ -47,7 +48,7 @@
 
 
 // Helpers
-int stringIsNumber(std::string str){
+short stringIsNumber(std::string str){
   /*
 
     0 - Not a number
@@ -81,6 +82,17 @@ int stringIsNumber(std::string str){
 std::string removeFirstAndLast(std::string str){
   // Removes the first and last characters of a string, mainly useful for lexical analysis of string experssions.
   return str.substr(1, str.length() - 2);
+}
+
+int firstOccurance(std::string str, char c){
+  // Returns the index of the first occurance of an artbitrary character c within str. Returns -1 if it doesn't exist.
+  for (unsigned int i = 0; i < str.length(); i++){
+    if (str[i] == c){
+      return i;
+    }
+  }
+
+  return -1;
 }
 
 class Token
@@ -117,18 +129,26 @@ class Lexer{
       std::vector<Token> tokens; // A vector consisting of all the tokens
       
       // Recognized symbols
-      char symbols[] = {':', ',', '(', ')', '{', '}', '[', ']', '=', '+', '!'};
+      char symbols[] = {':', ',', '(', ')', '{', '}', '=', '+', '!'};
       std::string keywords[] = {"dec", "print", "if", "for", "function", "return", "and", "or"};
       
       std::string capture = ""; // A substring of each token capture at a given pos
       size_t pos = 0; // A sliding pointer along the string to capture individual chars
       size_t quotes = 0; // 0 quotes means we are not capturing a string, 1 means we are capturing a string
+      size_t brackets = 0; // 0 brackets means we are not within the context of an array, 1 or more means we are
       while (pos < input.size()){ // Iterate through the whole string
         char curr = input[pos]; // Store the current char
-
+        
         if (curr == '\n'){
           // Breaking into a new line
           tokens.push_back(Token("newline", ""));
+          continue;
+        }
+
+        if (brackets > 0 && curr == ','){
+          // We are currently capturing an array, therefore we neglect commas as individual tokens
+          capture += curr;
+          pos++;
           continue;
         }
 
@@ -163,11 +183,11 @@ class Lexer{
                 tokens.push_back(Token("string", capture));
               } else if (stringIsNumber(capture)) {
                 tokens.push_back(Token("number", capture));
+              } else if (capture[0] == '[' && capture[capture.size() - 1] == ']'){
+                tokens.push_back(Token("array", capture));
               } else {
                 tokens.push_back(Token("unknown", capture));
               }
-              
-              
             }
             
             capture = "";
@@ -184,20 +204,39 @@ class Lexer{
         if (curr == '"'){
           quotes = quotes == 0 ? 1 : 0;
         }
+
+        if (curr == '['){
+          brackets++;
+        }
+
+        if (curr == ']'){
+          brackets--;
+        }
         
         pos++; // Advance the sliding pointer
       }
 
       if (capture.size() > 0){ // There is a token to capture
-        if (capture == "dec"){
-          // Variable declaration
-          tokens.push_back(Token("keyword", "declare"));
-        } else {
+        bool recognized = false;
+        for (unsigned int i = 0; i < sizeof(keywords); i++){
+          if (capture == keywords[i]){
+            // This is a recognized keyword
+            tokens.push_back(Token("keyword", capture));
+            recognized = true;
+            break;
+          }
+        }
+
+        if (!recognized){
           // Undetected symbol
-          if (capture[0] == '"' && capture[capture.size() - 1] == '"'){
+          if (capture == "true" || capture == "false"){
+            tokens.push_back(Token("boolean", capture));
+          } else if (capture[0] == '"' && capture[capture.size() - 1] == '"'){
             tokens.push_back(Token("string", capture));
           } else if (stringIsNumber(capture)) {
             tokens.push_back(Token("number", capture));
+          } else if (capture[0] == '[' && capture[capture.size() - 1] == ']'){
+            tokens.push_back(Token("array", capture));
           } else {
             tokens.push_back(Token("unknown", capture));
           }
@@ -289,9 +328,8 @@ class Interpreter{
       }
 
       
-
       Token first_token = local_tokens[0];
-      if (first_token.type == "string" || first_token.type == "number" || first_token.type == "boolean"){
+      if (first_token.type == "string" || first_token.type == "number" || first_token.type == "boolean" || first_token.type == "array"){
         if (local_tokens.size() > 1){
           const Token after_token = local_tokens[1];
           if (after_token.type == "symbol" && after_token.value == "+"){
@@ -352,10 +390,48 @@ class Interpreter{
           }
         }
 
+        // Locate the index of the first occurance of '[' within our token
+        int first_occurance = firstOccurance(first_token.value, '[');
+        if (first_occurance != -1){
+          // Potential indexing of an array element
+          const std::string name = first_token.value.substr(0, first_occurance); // Capture the name of the array that is being referenced
+          const std::vector<std::string> variable = find_variable(name);
+          if (variable.size() > 0 && variable[0] == "array"){
+            // Array variable exists
+            const std::string index = first_token.value.substr(first_occurance + 1, first_token.value.size() - 1 - first_occurance - 2 + 1);
+            
+            const int index_number = std::stoi(index);
+            std::string array_contents = removeFirstAndLast(variable[2]); // We remove the brackets sorrounding the array, ex. [3,1] > 3,1
+            int current_index = 0; // Index within the literal array, and not of the current character iterated on
+
+            int array_contents_i = 0;
+            while (current_index != index_number && array_contents_i < array_contents.length()){
+              if (array_contents[array_contents_i] == ','){
+                current_index++;
+              }
+
+              array_contents_i++;
+            }
+
+            std::string array_capture = ""; // Capture the searched element
+            // Currently the array_contents_i points to where to start capturing the value within our desired index
+            while (array_contents[array_contents_i] != ',' && array_contents_i < array_contents.length()){
+              array_capture += array_contents[array_contents_i];
+              array_contents_i++;
+            }
+
+            return Token("number", array_capture); // currently only supporting numbers
+          } else {
+            // Array variable is not a valid array or it does not exist
+          }
+        }
+
         // If this is not a function then it may be a variable
         std::vector<std::string> variable = find_variable(local_tokens[0].value);
         if (variable.size() > 0){
           return Token(variable[0], variable[2]);
+        } else {
+          // Variable does not exist
         }
       }
 
@@ -455,7 +531,7 @@ class Interpreter{
 
                 
                 Token value = tokens[i + 3];
-                if (value.type == "string" || value.type == "number" || value.type == "boolean"){
+                if (value.type == "string" || value.type == "number" || value.type == "boolean" || value.type == "array"){
                   // We want to remove the quotation marks from strings
                   std::vector<std::string> memoryVariable = constructMemoryVariable(
                     value.type,
@@ -466,7 +542,7 @@ class Interpreter{
                   memory.push_back(memoryVariable);
                   i = i + 3;
                 }
-
+                
                 // It may be containing an expression within, such as var x = (...), therefore we should check for brackets.
                 if (value.type == "symbol" && value.value == "("){
                   std::vector<Token> arguments_tokens;
@@ -498,7 +574,7 @@ class Interpreter{
               
               i = j;
               Token value = evaluate_experssion(arguments_tokens);
-              if (value.type == "string" || value.type == "number" || value.type == "boolean"){
+              if (value.type == "string" || value.type == "number" || value.type == "boolean" || value.type == "array"){
                 output_log(value.value, l);
               }
             }
@@ -509,31 +585,35 @@ class Interpreter{
             const Token loop_variable = tokens[i + 1];
             if (loop_variable.type == "unknown"){
               const Token symbol_one = tokens[i + 2];
-              if (symbol_one.type == "symbol" && symbol_one.value == "("){
-                const Token start = tokens[i + 3];
-                if (start.type == "number"){
-                  const Token symbol_two = tokens[i + 4];
-                  if (symbol_two.type == "symbol" && symbol_two.value == ","){
-                    const Token end = tokens[i + 5];
-                    if (end.type == "number"){
-                      // We thus far have a for loop with: for loop_variable (start,end)
-                      const Token symbol_three = tokens[i + 6];
-                      if (symbol_three.type == "symbol" && symbol_three.value == ")")
-                      {
-                        const Token symbol_four = tokens[i + 7];
-                        if (symbol_four.type == "symbol" && symbol_four.value == "{"){
-                          // We need to capture all the code within the for loop's boundaries
-                          std::vector<Token> exceution_tokens;
-                          
-                          int j;
-                          std::tie(exceution_tokens, j) = get_nested_tokens(i + 8, "{", "}");
-
-                          // We have captured all the code within the for loop's boundaries
-                          for (int k = std::stof(start.value); k <= std::stof(end.value); k++){
-                            execute(exceution_tokens);
+              if (symbol_one.type == "symbol" && symbol_one.value == "="){
+                const Token left_bracket = tokens[i + 3];
+                if (left_bracket.type == "symbol" && left_bracket.value == "(")
+                {
+                  const Token start = tokens[i + 4];
+                  if (start.type == "number"){
+                    const Token symbol_two = tokens[i + 5];
+                    if (symbol_two.type == "symbol" && symbol_two.value == ","){
+                      const Token end = tokens[i + 6];
+                      if (end.type == "number"){
+                        // We thus far have a for loop with: for loop_variable (start,end)
+                        const Token symbol_three = tokens[i + 7];
+                        if (symbol_three.type == "symbol" && symbol_three.value == ")")
+                        {
+                          const Token symbol_four = tokens[i + 8];
+                          if (symbol_four.type == "symbol" && symbol_four.value == "{"){
+                            // We need to capture all the code within the for loop's boundaries
+                            std::vector<Token> exceution_tokens;
+                            
+                            int j;
+                            std::tie(exceution_tokens, j) = get_nested_tokens(i + 9, "{", "}");
+  
+                            // We have captured all the code within the for loop's boundaries
+                            for (int k = std::stof(start.value); k <= std::stof(end.value); k++){
+                              execute(exceution_tokens);
+                            }
+                            
+                            i = j;
                           }
-                          
-                          i = j;
                         }
                       }
                     }
@@ -678,7 +758,7 @@ int main() {
   std::cout << std::endl << std::endl;
   std::cout << "Program Execution Output:" << std::endl;
 
-  std::string test = "dec a = 5 print(a) a=3 print(a)";
+  std::string test = "";
   Lexer lexer = Lexer(test);
   std::vector<Token> tokens = lexer.tokenize();
   
