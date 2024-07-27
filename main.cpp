@@ -10,7 +10,7 @@
   - Boolean logical operators (and, or)
   - String concatenation
   - Variable assignment post-declaration
-  - Arrays (including multiple-dimensional arrays, arrays containing different types, and indexing)
+  - Arrays (including multiple-dimensions arrays, arrays containing different types, and indexing)
 
   Example Code:
   ---------------
